@@ -5,7 +5,7 @@ currencyNameSingular: "Dollar"
 currencyNamePlural: "Dollars"
 startingBalance: 100.00
 minimumPayAmount: 0.01
-# Changing the locale will change wht format the money is in, see 
+# Changing the locale will change what format the money is in, see 
 # https://www.techonthenet.com/js/language_tags.php for examples.
 locale: "en-US"
 # Note: The custom symbol may not work if minecraft doesn't allow that symbol.

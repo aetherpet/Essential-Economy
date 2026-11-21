@@ -68,7 +68,8 @@ public class ChatManager {
             msg = msg.replace("%prefix%", prefix);
             if (placeholders != null) {
                 for (Map.Entry<String, String> entry : placeholders.entrySet()) {
-                    msg = msg.replace(entry.getKey(), entry.getValue());
+                    String value = entry.getValue() != null ? entry.getValue() : "";
+                    msg = msg.replace(entry.getKey(), value);
                 }
             }
             String translated = translateLegacy(msg);

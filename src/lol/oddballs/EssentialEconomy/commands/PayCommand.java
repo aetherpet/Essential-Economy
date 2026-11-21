@@ -30,7 +30,7 @@ public class PayCommand implements CommandExecutor, TabCompleter {
 
     @Override
     public boolean onCommand(@NotNull CommandSender sender, @NotNull Command command, @NotNull String label, @NotNull String[] args) {
-        if (!sender.hasPermission("economy.command.pay")) {
+        if (!plugin.hasPermission(sender, "command.pay")) {
             chatManager.sendConfigMessage(sender, "nopermission");
             return true;
         }
@@ -47,15 +47,16 @@ public class PayCommand implements CommandExecutor, TabCompleter {
 
         Player player = (Player) sender;
 
-        @SuppressWarnings("deprecation")
-        OfflinePlayer target = Bukkit.getOfflinePlayer(args[0]);
+        OfflinePlayer target = plugin.getOfflinePlayerCached(args[0]);
 
-        if (!target.hasPlayedBefore() && !target.isOnline()) {
+        if (target == null || (!target.hasPlayedBefore() && !target.isOnline())) {
             Map<String, String> placeholders = new HashMap<>();
             placeholders.put("%player%", args[0]);
             chatManager.sendConfigMessage(sender, "pay.otherDoesntExist", placeholders);
             return true;
         }
+
+        String targetName = target.getName() != null ? target.getName() : args[0];
 
         if (target.getUniqueId().equals(player.getUniqueId())) {
             chatManager.sendConfigMessage(sender, "pay.cannotPaySelf");
@@ -69,7 +70,7 @@ public class PayCommand implements CommandExecutor, TabCompleter {
 
         if (!plugin.getEco().hasAccount(target.getUniqueId())) {
             Map<String, String> placeholders = new HashMap<>();
-            placeholders.put("%player%", target.getName());
+            placeholders.put("%player%", targetName);
             chatManager.sendConfigMessage(sender, "pay.otherNoAccount", placeholders);
             return true;
         }
@@ -85,7 +86,7 @@ public class PayCommand implements CommandExecutor, TabCompleter {
         }
 
         double minimum = plugin.getConfigHandler().getMinimumPayAmount();
-        if (amount < minimum) {
+        if (!Double.isFinite(amount) || amount <= 0 || amount < minimum) {
             Map<String, String> placeholders = new HashMap<>();
             placeholders.put("%amount%", args[1]);
             placeholders.put("%minimum%", EconomyMain.format(minimum));
@@ -93,18 +94,17 @@ public class PayCommand implements CommandExecutor, TabCompleter {
             return true;
         }
 
-        if (!plugin.getEco().has(player.getUniqueId(), amount)) {
+        if (!plugin.getEco().has(player.getUniqueId(), amount) || !plugin.getEco().withdraw(player.getUniqueId(), amount)) {
             chatManager.sendConfigMessage(sender, "pay.insufficientFunds");
             return true;
         }
 
-        plugin.getEco().withdraw(player.getUniqueId(), amount);
         plugin.getEco().deposit(target.getUniqueId(), amount);
 
         String formattedAmount = EconomyMain.format(amount);
 
         Map<String, String> senderPlaceholders = new HashMap<>();
-        senderPlaceholders.put("%player%", target.getName());
+        senderPlaceholders.put("%player%", targetName);
         senderPlaceholders.put("%amount%", formattedAmount);
         chatManager.sendConfigMessage(player, "pay.paid", senderPlaceholders);
 
@@ -123,6 +123,9 @@ public class PayCommand implements CommandExecutor, TabCompleter {
 
     @Override
     public @Nullable List<String> onTabComplete(@NotNull CommandSender sender, @NotNull Command command, @NotNull String label, @NotNull String[] args) {
+        if (!plugin.hasPermission(sender, "command.pay")) {
+            return new ArrayList<>();
+        }
         if (args.length == 1) {
             String partial = args[0].toLowerCase();
             return Bukkit.getOnlinePlayers().stream()

@@ -1,10 +1,14 @@
 package lol.oddballs.EssentialEconomy;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.text.NumberFormat;
 import java.util.ArrayList;
-import java.util.Arrays;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.Currency;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
@@ -12,6 +16,7 @@ import lol.oddballs.EssentialEconomy.utils.ChatManager;
 import org.bukkit.Bukkit;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.command.CommandSender;
+import org.bukkit.entity.Player;
 import org.bukkit.plugin.ServicePriority;
 import org.bukkit.plugin.java.JavaPlugin;
 
@@ -97,7 +102,15 @@ public class EconomyMain extends JavaPlugin {
 
 	@Override
 	public void onDisable() {
-
+		if (balanceTopRunnable != null) {
+			try {
+				balanceTopRunnable.cancel();
+			} catch (IllegalStateException ignored) {
+			}
+		}
+		if (eco != null) {
+			eco.close();
+		}
 	}
 	
 	public static EconomyMain getInstance() {
@@ -138,47 +151,86 @@ public class EconomyMain extends JavaPlugin {
 		return true;
 	}
 	
-	public double getAmountFromString(String string) {
-		int mult = 0;
-		for (Map.Entry<String, Integer> suffix : configHandler.getSuffixes().entrySet()) {
-			if (string.endsWith(suffix.getKey())) {
-				string = string.substring(0, string.length() - 1);
-				mult = suffix.getValue();
-			}
+	public boolean hasPermission(CommandSender sender, String node) {
+		String shortNode = node;
+		if (shortNode.startsWith("economy.")) {
+			shortNode = shortNode.substring("economy.".length());
+		} else if (shortNode.startsWith("essentialeconomy.")) {
+			shortNode = shortNode.substring("essentialeconomy.".length());
 		}
-		double pow = Math.pow(10, mult);
-		return Math.round(Double.valueOf(string) * (100.0 * pow)) / (100.0 * pow) * pow;
+		String ecoPerm = "economy." + shortNode;
+		String essentialPerm = "essentialeconomy." + shortNode;
+
+		boolean ecoSet = sender.isPermissionSet(ecoPerm);
+		boolean essentialSet = sender.isPermissionSet(essentialPerm);
+
+		if (ecoSet && essentialSet) {
+			return sender.hasPermission(ecoPerm) || sender.hasPermission(essentialPerm);
+		}
+		if (ecoSet) {
+			return sender.hasPermission(ecoPerm);
+		}
+		if (essentialSet) {
+			return sender.hasPermission(essentialPerm);
+		}
+		return sender.hasPermission(ecoPerm) || sender.hasPermission(essentialPerm);
 	}
-	
 
-	@SuppressWarnings("deprecation")
-	public ArrayList<OfflinePlayer> getPlayersFromString(CommandSender sender, String name) {
-
-		OfflinePlayer player = Bukkit.getOfflinePlayer(name);
-		
-		ArrayList<OfflinePlayer> players = new ArrayList<OfflinePlayer>();
-		
-		if (player == null && !name.equals("@a")) {
-			
-			return players;
-			
+	public double getAmountFromString(String string) {
+		if (string == null || string.trim().isEmpty()) {
+			throw new NumberFormatException("Empty amount");
 		}
-		
-		if (name.equals("@a")) {
-			
-			players.addAll(new ArrayList<OfflinePlayer>(Bukkit.getOnlinePlayers()));
+		String cleaned = string.trim();
+		int mult = 0;
 
-			if (sender instanceof OfflinePlayer) {
-				
-				players.remove((OfflinePlayer) sender);
-				
+		List<Map.Entry<String, Integer>> suffixes = new ArrayList<>(configHandler.getSuffixes().entrySet());
+		suffixes.sort(Comparator.comparingInt((Map.Entry<String, Integer> e) -> e.getKey().length()).reversed());
+
+		for (Map.Entry<String, Integer> suffix : suffixes) {
+			String key = suffix.getKey();
+			if (!key.isEmpty() && cleaned.endsWith(key)) {
+				cleaned = cleaned.substring(0, cleaned.length() - key.length());
+				mult = suffix.getValue();
+				break;
 			}
-			
+		}
+
+		BigDecimal value = new BigDecimal(cleaned).movePointRight(mult).setScale(2, RoundingMode.HALF_UP);
+		double result = value.doubleValue();
+		if (!Double.isFinite(result)) {
+			throw new NumberFormatException("Non-finite amount");
+		}
+		return result;
+	}
+
+	public OfflinePlayer getOfflinePlayerCached(String name) {
+		if (name == null || name.isEmpty()) {
+			return null;
+		}
+		Player online = Bukkit.getPlayerExact(name);
+		if (online != null) {
+			return online;
+		}
+		return Bukkit.getOfflinePlayerIfCached(name);
+	}
+
+	public ArrayList<OfflinePlayer> getPlayersFromString(CommandSender sender, String name) {
+		ArrayList<OfflinePlayer> players = new ArrayList<>();
+		if (name == null || name.isEmpty()) {
 			return players;
 		}
-		
-		return new ArrayList<OfflinePlayer>(Arrays.asList(player));
-		
+
+		if (name.equalsIgnoreCase("@a")) {
+			players.addAll(Bukkit.getOnlinePlayers());
+			return players;
+		}
+
+		OfflinePlayer player = getOfflinePlayerCached(name);
+		if (player != null && (player.hasPlayedBefore() || player.isOnline())) {
+			return new ArrayList<>(Collections.singletonList(player));
+		}
+
+		return players;
 	}
 	
 	public static String format(double amount) {

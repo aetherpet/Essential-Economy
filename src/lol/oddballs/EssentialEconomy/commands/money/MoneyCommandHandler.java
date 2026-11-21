@@ -36,6 +36,10 @@ public class MoneyCommandHandler implements CommandExecutor, TabCompleter {
     @Override
     public boolean onCommand(@NotNull CommandSender sender, @NotNull Command command, @NotNull String label, @NotNull String[] args) {
         if (args.length == 0) {
+            if (!plugin.hasPermission(sender, "command.help")) {
+                chatManager.sendConfigMessage(sender, "nopermission");
+                return true;
+            }
             moneyHelpCommand.execute(sender, args);
             return true;
         }
@@ -43,14 +47,14 @@ public class MoneyCommandHandler implements CommandExecutor, TabCompleter {
         String subCommand = args[0].toLowerCase();
         switch (subCommand) {
             case "give":
-                if (!sender.hasPermission("economy.command.give")) {
+                if (!plugin.hasPermission(sender, "command.give")) {
                     chatManager.sendConfigMessage(sender, "nopermission");
                     return true;
                 }
                 moneyGiveCommand.execute(sender, args);
                 break;
             case "set":
-                if (!sender.hasPermission("economy.command.set")) {
+                if (!plugin.hasPermission(sender, "command.set")) {
                     chatManager.sendConfigMessage(sender, "nopermission");
                     return true;
                 }
@@ -58,7 +62,7 @@ public class MoneyCommandHandler implements CommandExecutor, TabCompleter {
                 break;
             case "take":
             case "remove":
-                if (!sender.hasPermission("economy.command.take")) {
+                if (!plugin.hasPermission(sender, "command.take")) {
                     chatManager.sendConfigMessage(sender, "nopermission");
                     return true;
                 }
@@ -66,14 +70,14 @@ public class MoneyCommandHandler implements CommandExecutor, TabCompleter {
                 break;
             case "reload":
             case "rl":
-                if (!sender.hasPermission("economy.command.reload")) {
+                if (!plugin.hasPermission(sender, "command.reload")) {
                     chatManager.sendConfigMessage(sender, "nopermission");
                     return true;
                 }
                 moneyReloadCommand.execute(sender, args);
                 break;
             case "help":
-                if (!sender.hasPermission("economy.command.help")) {
+                if (!plugin.hasPermission(sender, "command.help")) {
                     chatManager.sendConfigMessage(sender, "nopermission");
                     return true;
                 }
@@ -89,15 +93,36 @@ public class MoneyCommandHandler implements CommandExecutor, TabCompleter {
     @Override
     public List<String> onTabComplete(@NotNull CommandSender sender, @NotNull Command command, @NotNull String label, @NotNull String[] args) {
         if (args.length == 1) {
-            List<String> subcommands = Arrays.asList("give", "set", "take", "remove", "reload", "rl", "help");
+            List<String> subcommands = new ArrayList<>();
+            if (plugin.hasPermission(sender, "command.give")) subcommands.add("give");
+            if (plugin.hasPermission(sender, "command.set")) subcommands.add("set");
+            if (plugin.hasPermission(sender, "command.take")) {
+                subcommands.add("take");
+                subcommands.add("remove");
+            }
+            if (plugin.hasPermission(sender, "command.reload")) {
+                subcommands.add("reload");
+                subcommands.add("rl");
+            }
+            if (plugin.hasPermission(sender, "command.help")) subcommands.add("help");
+
             return subcommands.stream()
                     .filter(s -> s.toLowerCase().startsWith(args[0].toLowerCase()))
                     .collect(Collectors.toList());
         } else if (args.length == 2) {
             String subCommand = args[0].toLowerCase();
-            if (Arrays.asList("give", "set", "take", "remove").contains(subCommand)) {
-                return org.bukkit.Bukkit.getOnlinePlayers().stream()
+            boolean allowed = switch (subCommand) {
+                case "give" -> plugin.hasPermission(sender, "command.give");
+                case "set" -> plugin.hasPermission(sender, "command.set");
+                case "take", "remove" -> plugin.hasPermission(sender, "command.take");
+                default -> false;
+            };
+            if (allowed) {
+                List<String> suggestions = org.bukkit.Bukkit.getOnlinePlayers().stream()
                         .map(org.bukkit.entity.Player::getName)
+                        .collect(Collectors.toList());
+                suggestions.add("@a");
+                return suggestions.stream()
                         .filter(name -> name.toLowerCase().startsWith(args[1].toLowerCase()))
                         .collect(Collectors.toList());
             }

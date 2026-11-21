@@ -15,14 +15,15 @@ import lol.oddballs.EssentialEconomy.data.YamlData;
 public class YamlEconomy implements Economy {
 	
 	private final EconomyMain plugin;
+	private final Object lock = new Object();
 	
 	public YamlEconomy(EconomyMain plugin) {
 		this.plugin = plugin;
 		
-		Path dataDir = Paths.get(plugin.getPath() + "/data/");
+		Path dataDir = Paths.get(plugin.getPath(), "data");
 		if (!Files.exists(dataDir)) {
 			try {
-				Files.createDirectory(dataDir);
+				Files.createDirectories(dataDir);
 			} catch (IOException e) {
 				plugin.warn("There was an error creating the data directory.");
 	            return;
@@ -33,69 +34,108 @@ public class YamlEconomy implements Economy {
 
 	@Override
 	public boolean createAccount(UUID uuid) {
-		set(uuid, plugin.getConfigHandler().getStartingBalance());
-		return true;
+		synchronized (lock) {
+			if (hasAccount(uuid)) {
+				return true;
+			}
+			return set(uuid, plugin.getConfigHandler().getStartingBalance());
+		}
 	}
 
 	@Override
 	public boolean hasAccount(UUID uuid) {
-		File file = new File(plugin.getPath() + "/data/" + uuid.toString() + ".yml");
-		return file.exists();
+		synchronized (lock) {
+			File file = new File(plugin.getPath() + "/data/" + uuid.toString() + ".yml");
+			return file.exists();
+		}
 	}
 
 	@Override
 	public boolean delete(UUID uuid) {
-		File islandFile = new File(plugin.getPath() + "/data/" + uuid.toString() + ".yml");
-		islandFile.delete();
-		return true;
+		synchronized (lock) {
+			File islandFile = new File(plugin.getPath() + "/data/" + uuid.toString() + ".yml");
+			return islandFile.delete();
+		}
 	}
 
 	@Override
 	public boolean withdraw(UUID uuid, double amount) {
-		return set(uuid, getBalance(uuid).getBalance() - amount);
+		if (!Double.isFinite(amount) || amount < 0)
+			return false;
+		synchronized (lock) {
+			double current = getBalance(uuid).getBalance();
+			if (current < amount)
+				return false;
+			return set(uuid, current - amount);
+		}
 	}
 
 	@Override
 	public boolean deposit(UUID uuid, double amount) {
-		return set(uuid, getBalance(uuid).getBalance() + amount);
+		if (!Double.isFinite(amount) || amount < 0)
+			return false;
+		synchronized (lock) {
+			return set(uuid, getBalance(uuid).getBalance() + amount);
+		}
 	}
 
 	@Override
 	public boolean set(UUID uuid, double amount) {
-		if (amount < 0)
+		if (!Double.isFinite(amount) || amount < 0)
 			return false;
-		YamlData data = new YamlData(uuid.toString() + ".yml", plugin.getPath() + "/data");
-		data.getConfig().set("UUID", uuid.toString());
-		data.getConfig().set("Balance", amount);
-		data.saveConfig();
-		return true;
+		synchronized (lock) {
+			YamlData data = new YamlData(uuid.toString() + ".yml", plugin.getPath() + "/data");
+			data.getConfig().set("UUID", uuid.toString());
+			data.getConfig().set("Balance", amount);
+			data.saveConfig();
+			return true;
+		}
 	}
 
 	@Override
 	public boolean has(UUID uuid, double amount) {
-		return getBalance(uuid).getBalance() >= amount;
+		if (!Double.isFinite(amount))
+			return false;
+		synchronized (lock) {
+			return getBalance(uuid).getBalance() >= amount;
+		}
 	}
 
 	@Override
 	public PlayerBalance getBalance(UUID uuid) {
-		try {
-			YamlData data = new YamlData(uuid.toString() + ".yml", plugin.getPath() + "/data");
-			double balance = data.getConfig().getDouble("Balance");
-			return new PlayerBalance(uuid, balance);
-		} catch (Exception e) {
-			return new PlayerBalance(uuid, 0);
+		synchronized (lock) {
+			try {
+				if (!hasAccount(uuid)) {
+					return new PlayerBalance(uuid, 0);
+				}
+				YamlData data = new YamlData(uuid.toString() + ".yml", plugin.getPath() + "/data");
+				double balance = data.getConfig().getDouble("Balance");
+				return new PlayerBalance(uuid, balance);
+			} catch (Exception e) {
+				return new PlayerBalance(uuid, 0);
+			}
 		}
 	}
 
 	@Override
 	public List<PlayerBalance> getPlayers() {
-		List<PlayerBalance> playerData = new ArrayList<PlayerBalance>();
-		File[] files = new File(plugin.getPath() + "/data").listFiles();
-		if (files == null) return playerData;
-		for (File file : files) {
-			playerData.add(getBalance(UUID.fromString(file.getName().replace(".yml", ""))));
+		synchronized (lock) {
+			List<PlayerBalance> playerData = new ArrayList<PlayerBalance>();
+			File[] files = new File(plugin.getPath() + "/data").listFiles();
+			if (files == null) return playerData;
+			for (File file : files) {
+				if (!file.isFile() || !file.getName().endsWith(".yml")) {
+					continue;
+				}
+				String rawUuid = file.getName().substring(0, file.getName().length() - 4);
+				try {
+					UUID uuid = UUID.fromString(rawUuid);
+					playerData.add(getBalance(uuid));
+				} catch (IllegalArgumentException ignored) {
+				}
+			}
+			return playerData;
 		}
-		return playerData;
 	}
 
 }

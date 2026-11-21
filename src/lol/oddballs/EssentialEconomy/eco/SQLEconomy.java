@@ -6,6 +6,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -38,7 +39,7 @@ public class SQLEconomy implements Economy {
 			
 			try (Statement statement = sql.getConnection().createStatement()) {
 				DatabaseMetaData md = sql.getConnection().getMetaData();
-				statement.execute("CREATE TABLE IF NOT EXISTS Economy (UUID VARCHAR(36) NOT NULL);");
+				statement.execute("CREATE TABLE IF NOT EXISTS Economy (UUID VARCHAR(36) NOT NULL PRIMARY KEY);");
 				for (Map.Entry<String, String> column : plugin.getSQLColumns().entrySet()) {
 					try (ResultSet rs = md.getColumns(null, null, "Economy", column.getKey())) {
 						if (!rs.next()) {
@@ -83,7 +84,7 @@ public class SQLEconomy implements Economy {
 	@Override
 	public boolean createAccount(UUID uuid) {
 		PlayerBalance playerBalance = new PlayerBalance(uuid, plugin.getConfigHandler().getStartingBalance());
-		try (PreparedStatement statement = sql.getConnection().prepareStatement("INSERT INTO Economy "
+		try (PreparedStatement statement = sql.getConnection().prepareStatement("INSERT IGNORE INTO Economy "
 				+ "(UUID, Balance) VALUES (?, ?);")) {
 			statement.setString(1, playerBalance.getUUID().toString());
 			statement.setDouble(2, playerBalance.getBalance());
@@ -123,23 +124,43 @@ public class SQLEconomy implements Economy {
 
 	@Override
 	public boolean withdraw(UUID uuid, double amount) {
-		return set(uuid, getBalance(uuid).getBalance() - amount);
+		if (!Double.isFinite(amount) || amount < 0)
+			return false;
+		try (PreparedStatement statement = sql.getConnection().prepareStatement(
+				"UPDATE Economy SET Balance = Balance - ? WHERE UUID = ? AND Balance >= ?")) {
+			statement.setDouble(1, amount);
+			statement.setString(2, uuid.toString());
+			statement.setDouble(3, amount);
+			return statement.executeUpdate() > 0;
+		} catch (SQLException e) {
+			plugin.warn(e.getMessage());
+			return false;
+		}
 	}
 
 	@Override
 	public boolean deposit(UUID uuid, double amount) {
-		return set(uuid, getBalance(uuid).getBalance() + amount);
+		if (!Double.isFinite(amount) || amount < 0)
+			return false;
+		try (PreparedStatement statement = sql.getConnection().prepareStatement(
+				"UPDATE Economy SET Balance = Balance + ? WHERE UUID = ?")) {
+			statement.setDouble(1, amount);
+			statement.setString(2, uuid.toString());
+			return statement.executeUpdate() > 0;
+		} catch (SQLException e) {
+			plugin.warn(e.getMessage());
+			return false;
+		}
 	}
 
 	@Override
 	public boolean set(UUID uuid, double amount) {
-		if (amount < 0)
+		if (!Double.isFinite(amount) || amount < 0)
 			return false;
 		try (PreparedStatement statement = sql.getConnection().prepareStatement("UPDATE Economy SET "
-				+ "UUID=?, Balance=? WHERE UUID=?")) {
-			statement.setString(1, uuid.toString());
-			statement.setDouble(2, amount);
-			statement.setString(3, uuid.toString());
+				+ "Balance=? WHERE UUID=?")) {
+			statement.setDouble(1, amount);
+			statement.setString(2, uuid.toString());
 			statement.executeUpdate();
 		} catch(SQLException e) {
 			plugin.warn(e.getMessage());
@@ -150,12 +171,12 @@ public class SQLEconomy implements Economy {
 
 	@Override
 	public boolean has(UUID uuid, double amount) {
-		return getBalance(uuid).getBalance() >= amount;
+		return Double.isFinite(amount) && getBalance(uuid).getBalance() >= amount;
 	}
 
 	@Override
 	public PlayerBalance getBalance(UUID uuid) {
-		try (PreparedStatement statement = sql.getConnection().prepareStatement("SELECT * FROM Economy "
+		try (PreparedStatement statement = sql.getConnection().prepareStatement("SELECT Balance FROM Economy "
 				+ "WHERE UUID=?")) {
 			statement.setString(1, uuid.toString());
 			try (ResultSet result = statement.executeQuery()) {
@@ -172,17 +193,29 @@ public class SQLEconomy implements Economy {
 	@Override
 	public List<PlayerBalance> getPlayers() {
 		try (Statement statement = sql.getConnection().createStatement();
-			 ResultSet result = statement.executeQuery("SELECT * FROM Economy;")) {
+			 ResultSet result = statement.executeQuery("SELECT UUID, Balance FROM Economy;")) {
 			List<PlayerBalance> playerData = new ArrayList<PlayerBalance>();
 			while (result.next()) {
-				UUID uuid = UUID.fromString(result.getString("UUID"));
-				double balance = result.getDouble("Balance");
-				playerData.add(new PlayerBalance(uuid, balance));
+				try {
+					UUID uuid = UUID.fromString(result.getString("UUID"));
+					double balance = result.getDouble("Balance");
+					playerData.add(new PlayerBalance(uuid, balance));
+				} catch (IllegalArgumentException ignored) {
+				}
 			}
 			return playerData;
 		} catch (SQLException e) {
 			plugin.warn(e.getMessage());
-			return null;
+			return Collections.emptyList();
+		}
+	}
+
+	@Override
+	public void close() {
+		try {
+			sql.disconnect();
+		} catch (SQLException e) {
+			plugin.warn("Error closing MySQL connection: " + e.getMessage());
 		}
 	}
 

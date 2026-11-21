@@ -18,19 +18,17 @@ public class PlayerJoinListener implements Listener {
 
 	@EventHandler
 	public void onPlayerJoin(PlayerJoinEvent event) {
-		
 		Player player = event.getPlayer();
-		
-		if (!plugin.getEco().hasAccount(player.getUniqueId())) {
-			new BukkitRunnable() {
+		java.util.UUID uuid = player.getUniqueId();
 
-				@Override
-				public void run() {
-					plugin.getEco().createAccount(player.getUniqueId());
+		new BukkitRunnable() {
+			@Override
+			public void run() {
+				if (!plugin.getEco().hasAccount(uuid)) {
+					plugin.getEco().createAccount(uuid);
 				}
-			}.runTaskAsynchronously(plugin);
-		}
-		
+			}
+		}.runTaskAsynchronously(plugin);
 	}
 	
 }

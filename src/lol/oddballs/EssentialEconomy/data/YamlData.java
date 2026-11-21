@@ -4,6 +4,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.util.logging.Level;
 
 import org.bukkit.configuration.Configuration;
@@ -28,12 +29,16 @@ public class YamlData {
 	public void reloadConfig() {
 		if (configFile == null)
 			configFile = new File(path, fileName);
-		dataConfig = (FileConfiguration)YamlConfiguration.loadConfiguration(configFile);
-		InputStream defaultStream = EconomyMain.getInstance().getResource(fileName);
-		if (defaultStream != null) {
-			YamlConfiguration defaultConfig = YamlConfiguration.loadConfiguration(new InputStreamReader(defaultStream));
-			dataConfig.setDefaults((Configuration)defaultConfig);
-		} 
+		dataConfig = YamlConfiguration.loadConfiguration(configFile);
+		try (InputStream defaultStream = EconomyMain.getInstance().getResource(fileName)) {
+			if (defaultStream != null) {
+				YamlConfiguration defaultConfig = YamlConfiguration.loadConfiguration(
+						new InputStreamReader(defaultStream, StandardCharsets.UTF_8));
+				dataConfig.setDefaults((Configuration) defaultConfig);
+			}
+		} catch (IOException e) {
+			EconomyMain.getInstance().getLogger().log(Level.WARNING, "Could not load default stream for " + fileName, e);
+		}
 	}
   
 	public FileConfiguration getConfig() {
@@ -55,12 +60,20 @@ public class YamlData {
 	public void saveDefaultConfig() {
 		if (configFile == null)
 			configFile = new File(path, fileName);
-		try {
-			configFile.createNewFile();
-		} catch (IOException e) {
-			e.printStackTrace();
+		if (!configFile.exists()) {
+			File parent = configFile.getParentFile();
+			if (parent != null && !parent.exists()) {
+				parent.mkdirs();
+			}
+			if (EconomyMain.getInstance().getResource(fileName) != null) {
+				EconomyMain.getInstance().saveResource(fileName, false);
+			} else {
+				try {
+					configFile.createNewFile();
+				} catch (IOException e) {
+					EconomyMain.getInstance().getLogger().log(Level.SEVERE, "Could not create file " + configFile, e);
+				}
+			}
 		}
-		if (!configFile.exists())
-			EconomyMain.getInstance().saveResource(path + "/" + fileName, false);
 	}
 }

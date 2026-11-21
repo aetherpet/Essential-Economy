@@ -30,7 +30,7 @@ public class BalanceCommand implements CommandExecutor, TabCompleter {
 
     @Override
     public boolean onCommand(@NotNull CommandSender sender, @NotNull Command command, @NotNull String label, @NotNull String[] args) {
-        if (!sender.hasPermission("economy.command.balance")) {
+        if (!plugin.hasPermission(sender, "command.balance")) {
             chatManager.sendConfigMessage(sender, "nopermission");
             return true;
         }
@@ -52,18 +52,17 @@ public class BalanceCommand implements CommandExecutor, TabCompleter {
             return true;
         }
 
-        @SuppressWarnings("deprecation")
-        OfflinePlayer target = Bukkit.getOfflinePlayer(args[0]);
-        if (!target.hasPlayedBefore() && !target.isOnline()) {
+        OfflinePlayer target = plugin.getOfflinePlayerCached(args[0]);
+        if (target == null || (!target.hasPlayedBefore() && !target.isOnline()) || !plugin.getEco().hasAccount(target.getUniqueId())) {
             Map<String, String> placeholders = new HashMap<>();
-            placeholders.put("%player%", args[0]);
+            placeholders.put("%player%", target != null && target.getName() != null ? target.getName() : args[0]);
             chatManager.sendConfigMessage(sender, "balance.otherNoAccount", placeholders);
             return true;
         }
 
         double balance = plugin.getEco().getBalance(target.getUniqueId()).getBalance();
         Map<String, String> placeholders = new HashMap<>();
-        placeholders.put("%player%", target.getName());
+        placeholders.put("%player%", target.getName() != null ? target.getName() : args[0]);
         placeholders.put("%balance%", EconomyMain.format(balance));
         chatManager.sendConfigMessage(sender, "balance.otherBalance", placeholders);
         return true;
@@ -71,6 +70,9 @@ public class BalanceCommand implements CommandExecutor, TabCompleter {
 
     @Override
     public @Nullable List<String> onTabComplete(@NotNull CommandSender sender, @NotNull Command command, @NotNull String label, @NotNull String[] args) {
+        if (!plugin.hasPermission(sender, "command.balance")) {
+            return new ArrayList<>();
+        }
         if (args.length == 1) {
             String partial = args[0].toLowerCase();
             return Bukkit.getOnlinePlayers().stream()

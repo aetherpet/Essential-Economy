@@ -25,12 +25,12 @@ public class VaultImpl implements net.milkbowl.vault.economy.Economy {
 	
 	@Override
 	public String currencyNamePlural() {
-		return plugin.getConfigHandler().getMessage("currencyNamePlural");
+		return plugin.getConfigHandler().getCurrencyNamePlural();
 	}
 
 	@Override
 	public String currencyNameSingular() {
-		return plugin.getConfigHandler().getMessage("currencyNameSingular");
+		return plugin.getConfigHandler().getCurrencyNameSingular();
 	}
 
 	@Override

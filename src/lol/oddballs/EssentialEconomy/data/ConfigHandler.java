@@ -15,6 +15,8 @@ public class ConfigHandler {
     private FileConfiguration config;
 
     private int balanceTopInterval;
+    private String currencyNameSingular;
+    private String currencyNamePlural;
     private double startingBalance;
     private Locale locale;
     private boolean customSymbolEnabled;
@@ -40,6 +42,8 @@ public class ConfigHandler {
         this.config = plugin.getConfig();
 
         balanceTopInterval = config.getInt("BalanceTopTimerInterval", 1200);
+        currencyNameSingular = config.getString("currencyNameSingular", "Dollar");
+        currencyNamePlural = config.getString("currencyNamePlural", "Dollars");
         startingBalance = config.getDouble("startingBalance", 100.00);
         
         String localeTag = config.getString("locale", "en-US");
@@ -72,6 +76,14 @@ public class ConfigHandler {
 
     public int getBalanceTopInterval() {
         return balanceTopInterval;
+    }
+
+    public String getCurrencyNameSingular() {
+        return currencyNameSingular;
+    }
+
+    public String getCurrencyNamePlural() {
+        return currencyNamePlural;
     }
 
     public double getStartingBalance() {

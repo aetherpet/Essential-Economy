@@ -2,12 +2,12 @@ package lol.oddballs.EssentialEconomy.commands.money;
 
 import lol.oddballs.EssentialEconomy.EconomyMain;
 import lol.oddballs.EssentialEconomy.utils.ChatManager;
-import org.bukkit.Bukkit;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 public class MoneySetCommand {
@@ -20,25 +20,9 @@ public class MoneySetCommand {
         this.chatManager = plugin.getChatManager();
     }
 
-    @SuppressWarnings("deprecation")
     public void execute(CommandSender sender, String[] args) {
         if (args.length != 3) {
             chatManager.sendConfigMessage(sender, "money.set.usage");
-            return;
-        }
-
-        OfflinePlayer target = Bukkit.getOfflinePlayer(args[1]);
-        if (!target.hasPlayedBefore() && !target.isOnline()) {
-            Map<String, String> placeholders = new HashMap<>();
-            placeholders.put("%player%", args[1]);
-            chatManager.sendConfigMessage(sender, "money.set.otherDoesntExist", placeholders);
-            return;
-        }
-
-        if (!plugin.getEco().hasAccount(target.getUniqueId())) {
-            Map<String, String> placeholders = new HashMap<>();
-            placeholders.put("%player%", target.getName());
-            chatManager.sendConfigMessage(sender, "money.set.otherNoAccount", placeholders);
             return;
         }
 
@@ -52,25 +36,68 @@ public class MoneySetCommand {
             return;
         }
 
-        if (amount < 0) {
+        if (!Double.isFinite(amount) || amount < 0) {
             Map<String, String> placeholders = new HashMap<>();
             placeholders.put("%amount%", args[2]);
             chatManager.sendConfigMessage(sender, "money.set.invalidAmount", placeholders);
             return;
         }
 
-        plugin.getEco().set(target.getUniqueId(), amount);
+        List<OfflinePlayer> targets = plugin.getPlayersFromString(sender, args[1]);
+        if (targets.isEmpty()) {
+            Map<String, String> placeholders = new HashMap<>();
+            placeholders.put("%player%", args[1]);
+            chatManager.sendConfigMessage(sender, "money.set.otherDoesntExist", placeholders);
+            return;
+        }
+
         String formattedAmount = EconomyMain.format(amount);
 
+        if (args[1].equalsIgnoreCase("@a")) {
+            int count = 0;
+            for (OfflinePlayer target : targets) {
+                if (!plugin.getEco().hasAccount(target.getUniqueId())) {
+                    continue;
+                }
+                plugin.getEco().set(target.getUniqueId(), amount);
+                count++;
+                if (target.isOnline() && target.getPlayer() != null) {
+                    Map<String, String> targetPlaceholders = new HashMap<>();
+                    targetPlaceholders.put("%amount%", formattedAmount);
+                    chatManager.sendConfigMessage(target.getPlayer(), "money.set.set", targetPlaceholders);
+                }
+            }
+            Map<String, String> senderPlaceholders = new HashMap<>();
+            senderPlaceholders.put("%total%", String.valueOf(count));
+            senderPlaceholders.put("%balance%", formattedAmount);
+            chatManager.sendConfigMessage(sender, "money.set.setterMultiple", senderPlaceholders);
+            return;
+        }
+
+        OfflinePlayer target = targets.get(0);
+        String targetName = target.getName() != null ? target.getName() : args[1];
+
+        if (!plugin.getEco().hasAccount(target.getUniqueId())) {
+            Map<String, String> placeholders = new HashMap<>();
+            placeholders.put("%player%", targetName);
+            chatManager.sendConfigMessage(sender, "money.set.otherNoAccount", placeholders);
+            return;
+        }
+
+        plugin.getEco().set(target.getUniqueId(), amount);
+
         Map<String, String> senderPlaceholders = new HashMap<>();
-        senderPlaceholders.put("%player%", target.getName());
+        senderPlaceholders.put("%player%", targetName);
         senderPlaceholders.put("%balance%", formattedAmount);
         chatManager.sendConfigMessage(sender, "money.set.setter", senderPlaceholders);
 
         if (target.isOnline()) {
-            Map<String, String> targetPlaceholders = new HashMap<>();
-            targetPlaceholders.put("%amount%", formattedAmount);
-            chatManager.sendConfigMessage((Player) target, "money.set.set", targetPlaceholders);
+            Player onlineTarget = target.getPlayer();
+            if (onlineTarget != null) {
+                Map<String, String> targetPlaceholders = new HashMap<>();
+                targetPlaceholders.put("%amount%", formattedAmount);
+                chatManager.sendConfigMessage(onlineTarget, "money.set.set", targetPlaceholders);
+            }
         }
     }
 }

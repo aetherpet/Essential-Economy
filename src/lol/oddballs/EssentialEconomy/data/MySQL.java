@@ -21,27 +21,30 @@ public class MySQL {
     	this.password = password;
     }
     
-    public void connect() throws ClassNotFoundException, SQLException {
+    public synchronized void connect() throws ClassNotFoundException, SQLException {
         if (!isConnected()) {
             connection = DriverManager.getConnection("jdbc:mysql://" + host + ":" + port + "/" + database + "?autoReconnect=true&useSSL=false", username, password);
         }
     }
 
-    public void disconnect() throws SQLException {
-        if (isConnected()) {
+    public synchronized void disconnect() throws SQLException {
+        if (connection != null && !connection.isClosed()) {
         	connection.close();
         }
     }
     
-    public boolean isConnected() {
+    public synchronized boolean isConnected() {
         try {
-            return connection != null && !connection.isClosed();
+            return connection != null && !connection.isClosed() && connection.isValid(2);
         } catch (SQLException e) {
             return false;
         }
     }
 
-    public Connection getConnection() {
+    public synchronized Connection getConnection() throws SQLException {
+        if (!isConnected()) {
+            connection = DriverManager.getConnection("jdbc:mysql://" + host + ":" + port + "/" + database + "?autoReconnect=true&useSSL=false", username, password);
+        }
         return connection;
     }
 }

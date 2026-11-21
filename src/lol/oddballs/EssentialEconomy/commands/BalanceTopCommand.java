@@ -32,7 +32,7 @@ public class BalanceTopCommand implements CommandExecutor, TabCompleter {
 
     @Override
     public boolean onCommand(@NotNull CommandSender sender, @NotNull Command command, @NotNull String label, @NotNull String[] args) {
-        if (!sender.hasPermission("economy.command.balancetop")) {
+        if (!plugin.hasPermission(sender, "command.balancetop")) {
             chatManager.sendConfigMessage(sender, "nopermission");
             return true;
         }
@@ -114,6 +114,9 @@ public class BalanceTopCommand implements CommandExecutor, TabCompleter {
 
     @Override
     public @Nullable List<String> onTabComplete(@NotNull CommandSender sender, @NotNull Command command, @NotNull String label, @NotNull String[] args) {
+        if (!plugin.hasPermission(sender, "command.balancetop")) {
+            return new ArrayList<>();
+        }
         if (args.length == 1) {
             List<PlayerBalance> balances = plugin.getBalanceTopRunnable().getBalanceTop();
             int maxPages = balances.isEmpty() ? 1 : (int) Math.ceil((double) balances.size() / 10);

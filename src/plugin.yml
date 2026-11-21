@@ -1,7 +1,7 @@
 name: EssentialEconomy
 main: lol.oddballs.EssentialEconomy.EconomyMain
-version: 3.1.1-rtx_patched
-api-version: '1.21'
+version: 3.2.0
+api-version: '26.3'
 author: aethyrnet
 depend: [Vault]
 load: STARTUP
@@ -31,4 +31,20 @@ permissions:
   economy.command.set:
     default: op
   economy.command.reload:
+    default: op
+  essentialeconomy.command.balance:
+    default: true
+  essentialeconomy.command.balancetop:
+    default: true
+  essentialeconomy.command.help:
+    default: true
+  essentialeconomy.command.pay:
+    default: true
+  essentialeconomy.command.give:
+    default: op
+  essentialeconomy.command.take:
+    default: op
+  essentialeconomy.command.set:
+    default: op
+  essentialeconomy.command.reload:
     default: op

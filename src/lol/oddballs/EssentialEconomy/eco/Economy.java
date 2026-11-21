@@ -16,5 +16,8 @@ public interface Economy {
 	public PlayerBalance getBalance(UUID uuid);
 	
 	public List<PlayerBalance> getPlayers();
+
+	default void close() {
+	}
 	
 }

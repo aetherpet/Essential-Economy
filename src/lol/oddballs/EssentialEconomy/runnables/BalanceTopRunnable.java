@@ -1,6 +1,7 @@
 package lol.oddballs.EssentialEconomy.runnables;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 
@@ -12,7 +13,7 @@ import lol.oddballs.EssentialEconomy.eco.PlayerBalance;
 public class BalanceTopRunnable extends BukkitRunnable {
 	
 	private final EconomyMain plugin;
-	private List<PlayerBalance> balanceTop = new ArrayList<PlayerBalance>();
+	private volatile List<PlayerBalance> balanceTop = Collections.emptyList();
 	
 	public BalanceTopRunnable(EconomyMain plugin) {
 		this.plugin = plugin;
@@ -26,7 +27,7 @@ public class BalanceTopRunnable extends BukkitRunnable {
 		List<PlayerBalance> btop = new ArrayList<PlayerBalance>(players);
 		btop.sort(Comparator.comparingDouble(PlayerBalance::getBalance).reversed());
 
-		this.balanceTop = btop;
+		this.balanceTop = Collections.unmodifiableList(btop);
 		
 	}
 

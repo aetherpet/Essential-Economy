@@ -3,10 +3,10 @@ plugins {
 }
 
 group = 'lol.oddballs.EssentialEconomy'
-version = '3.1.1-rtx_patched'
+version = '3.2.0'
 
 java {
-    toolchain.languageVersion = JavaLanguageVersion.of(21)
+    toolchain.languageVersion = JavaLanguageVersion.of(25)
 }
 
 repositories {
@@ -16,9 +16,10 @@ repositories {
 }
 
 dependencies {
-    compileOnly 'io.papermc.paper:paper-api:1.21-R0.1-SNAPSHOT'
-    compileOnly 'com.github.MilkBowl:VaultAPI:1.7'
-    compileOnly 'net.kyori:adventure-text-minimessage:4.17.0'
+    compileOnly 'io.papermc.paper:paper-api:26.3.build.257-stable'
+    compileOnly('com.github.MilkBowl:VaultAPI:1.7') {
+        exclude group: 'org.bukkit', module: 'bukkit'
+    }
 }
 
 sourceSets {
